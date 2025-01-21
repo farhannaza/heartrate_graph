@@ -27,7 +27,7 @@ export default function HeartRateMonitor() {
     <Card className="w-full">
       <CardHeader>
         <CardTitle>Heart Rate History</CardTitle>
-        <CardDescription>Patient's heart rate over time</CardDescription>
+        <CardDescription>Patient&apos;s heart rate over time</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="mb-4">
