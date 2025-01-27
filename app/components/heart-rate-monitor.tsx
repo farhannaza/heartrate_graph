@@ -32,40 +32,53 @@ import {
 } from "recharts";
 
 interface HeartRateDataPoint {
-  time: string; // Formatted time string
-  timestamp: number; // UNIX timestamp
-  bpm: number; // Heart rate (bpm) value
+  bpm: number;
+  readable_date: string;
+  timestamp: number;
 }
 
 export default function HeartRateMonitor() {
-  const [timeRange, setTimeRange] = useState("6"); // Default to the last 6 hours
+  const [timeRange, setTimeRange] = useState("today"); // Default to today
   const [data, setData] = useState<HeartRateDataPoint[]>([]);
 
   useEffect(() => {
-    const heartRateRef = ref(database, "heart_rate_data/heart_rate_monitor");
+    const heartRateRef = ref(database, "heart_rate_data");
 
     const unsubscribe = onValue(heartRateRef, (snapshot) => {
       const rawData = snapshot.val();
       console.log("Raw data from Firebase:", rawData); // Debugging log
 
       if (rawData) {
+        // Convert Firebase data to an array and process it
         const now = Date.now();
-        const timeLimit = now - Number(timeRange) * 60 * 60 * 1000;
+        const startOfDay = new Date().setHours(0, 0, 0, 0);
+        const startOfYesterday = startOfDay - 24 * 60 * 60 * 1000;
+        const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+        const startOfYear = new Date(new Date().getFullYear(), 0, 1).getTime();
 
-        // Map and filter the data from Firebase
-        const formattedData: HeartRateDataPoint[] = Object.values(rawData)
+        const filteredData = Object.values(rawData)
           .map((entry: any) => ({
-            time: new Date(entry.timestamp * 1000).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            timestamp: entry.timestamp * 1000, // Convert seconds to milliseconds
             bpm: entry.bpm,
+            readable_date: entry.readable_date,
+            timestamp: entry.timestamp * 1000, // Convert seconds to milliseconds
           }))
-          .filter((dataPoint) => dataPoint.timestamp >= timeLimit);
+          .filter((dataPoint: HeartRateDataPoint) => {
+            switch (timeRange) {
+              case "today":
+                return dataPoint.timestamp >= startOfDay;
+              case "yesterday":
+                return dataPoint.timestamp >= startOfYesterday && dataPoint.timestamp < startOfDay;
+              case "month":
+                return dataPoint.timestamp >= startOfMonth;
+              case "year":
+                return dataPoint.timestamp >= startOfYear;
+              default:
+                return true;
+            }
+          });
 
-        console.log("Formatted data:", formattedData); // Debugging log
-        setData(formattedData);
+        console.log("Filtered Data:", filteredData); // Debugging log
+        setData(filteredData);
       }
     });
 
@@ -85,9 +98,10 @@ export default function HeartRateMonitor() {
               <SelectValue placeholder="Select time range" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="6">Last 6 hours</SelectItem>
-              <SelectItem value="12">Last 12 hours</SelectItem>
-              <SelectItem value="24">Last 24 hours</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="yesterday">Yesterday</SelectItem>
+              <SelectItem value="month">This Month</SelectItem>
+              <SelectItem value="year">This Year</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -103,7 +117,7 @@ export default function HeartRateMonitor() {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>
               <XAxis
-                dataKey="time"
+                dataKey="readable_date"
                 tick={{ fill: "hsl(var(--foreground))" }}
                 tickLine={{ stroke: "hsl(var(--foreground))" }}
               />
